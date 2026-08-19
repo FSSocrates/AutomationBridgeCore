@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutomationBridgeCore</string>
+    <string name="notification_channel_low">ABC Engine</string>
+    <string name="notification_channel_high">ABC Verification</string>
+    <string name="notification_title_active">ABC Engine Active</string>
+    <string name="notification_title_verify">Interactive Verification Required</string>
+    <string name="notification_text_verify">Tap to complete CAPTCHA / challenge</string>
+</resources>
