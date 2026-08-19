@@ -16,7 +16,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: Build & test
         run: |
           chmod +x gradlew
@@ -40,7 +40,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - run: chmod +x gradlew && ./gradlew :app:assembleDebug
       - uses: softprops/action-gh-release@v2
         with:
