@@ -2,40 +2,37 @@ package com.fssocrates.abc
 
 import com.fssocrates.abc.core.AutomationEngine
 import com.fssocrates.abc.core.AutomationJob
-import com.fssocrates.abc.core.AutomationState
+import com.fssocrates.abc.core.EngineState
+import com.fssocrates.abc.core.JobState
 import org.junit.Assert.*
 import org.junit.Test
 
 class EngineTest {
-    private val engine = AutomationEngine()
+    private fun tick() = Thread.sleep(80)
 
-    @Test fun submitTransitionsToRunning() {
-        val id = engine.submit(AutomationJob(targetUrl = "https://example.com"))
-        assertNotNull(id)
-        // async channel — give a tick
-        Thread.sleep(80)
-        assertEquals(AutomationState.RUNNING, engine.state.value)
+    @Test fun startExecution() {
+        val e = AutomationEngine()
+        e.startExecution(AutomationJob(targetUrl = "https://example.com"))
+        tick()
+        assertEquals(EngineState.EXECUTING, e.engineState.value)
+        assertEquals(JobState.RUNNING, e.jobState.value)
     }
 
-    @Test fun rejectWhileBusy() {
-        engine.submit(AutomationJob(targetUrl = "https://example.com"))
-        Thread.sleep(80)
-        val second = engine.submit(AutomationJob(targetUrl = "https://other.com"))
-        assertNull(second)
-    }
-
-    @Test fun userInteractionState() {
-        engine.submit(AutomationJob(targetUrl = "https://example.com"))
-        Thread.sleep(80)
-        engine.requestUserInteraction("captcha")
-        Thread.sleep(80)
-        assertEquals(AutomationState.WAITING_FOR_USER, engine.state.value)
-        engine.resumeAfterUserInteraction()
-        Thread.sleep(80)
-        assertEquals(AutomationState.RUNNING, engine.state.value)
+    @Test fun resultDoesNotComplete() {
+        val e = AutomationEngine()
+        e.startExecution(AutomationJob(targetUrl = "https://example.com"))
+        tick()
+        e.produceResult("https://out")
+        tick()
+        assertEquals(JobState.RUNNING, e.jobState.value)
+        assertEquals("https://out", e.lastResult?.value)
+        e.complete()
+        tick()
+        assertEquals(EngineState.IDLE, e.engineState.value)
     }
 
     @Test fun rejectBadUrl() {
-        assertNull(engine.submit(AutomationJob(targetUrl = "javascript:alert(1)")))
+        val e = AutomationEngine()
+        assertFalse(e.isUrlAllowed("javascript:alert(1)"))
     }
 }

@@ -1,7 +1,7 @@
 package com.fssocrates.abc
 
 import android.content.Context
-import com.fssocrates.abc.core.AutomationState
+import com.fssocrates.abc.core.JobState
 
 /** Lightweight durable snapshot (not full WebView recovery). */
 class DurableJobStore(context: Context) {
@@ -18,7 +18,7 @@ class DurableJobStore(context: Context) {
 
     fun load(): Triple<String?, String, String?> {
         val id = prefs.getString("jobId", null)
-        val state = prefs.getString("state", AutomationState.IDLE.name) ?: AutomationState.IDLE.name
+        val state = prefs.getString("state", "IDLE") ?: "IDLE"
         val error = prefs.getString("error", null)
         return Triple(id, state, error)
     }

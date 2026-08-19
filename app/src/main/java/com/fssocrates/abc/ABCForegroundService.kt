@@ -84,14 +84,18 @@ class ABCForegroundService : Service() {
                 val script = intent?.getStringExtra(IpcProtocol.EXTRA_SCRIPT)
                     ?: intent?.getStringExtra(EXTRA_SCRIPT)
                 val job = AutomationJob(targetUrl = url, script = script)
-                val id = coordinator.start(job)
-                if (id == null) {
-                    sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
-                        putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
-                        putExtra(IpcProtocol.EXTRA_JOB_ID, job.id)
-                        putExtra(IpcProtocol.EXTRA_EVENT, "JOB_REJECTED")
-                        putExtra(IpcProtocol.EXTRA_ERROR_CODE, "ENGINE_BUSY_OR_INVALID")
-                    })
+                when (val result = coordinator.submit(job)) {
+                    is com.fssocrates.abc.core.SubmitResult.Accepted -> {
+                        Timber.i("Accepted %s", result.jobId)
+                    }
+                    is com.fssocrates.abc.core.SubmitResult.Rejected -> {
+                        sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
+                            putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
+                            putExtra(IpcProtocol.EXTRA_JOB_ID, job.id)
+                            putExtra(IpcProtocol.EXTRA_EVENT, "JOB_REJECTED")
+                            putExtra(IpcProtocol.EXTRA_ERROR_CODE, result.reason.name)
+                        })
+                    }
                 }
             }
         }

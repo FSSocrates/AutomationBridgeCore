@@ -6,35 +6,39 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * JS bridge protocol (injected as "ABC").
- * Does not own state — forwards to AutomationEngine via [engine].
+ * JS API v1:
+ * - result / resultJson → produce result (does NOT complete)
+ * - complete() → finish job
+ * - requestUserInteraction / fail / log
  */
 object ABC {
-
     @Volatile
     var engine: com.fssocrates.abc.core.AutomationEngine? = null
 
     @JavascriptInterface
     fun result(value: String) {
-        engine?.deliverResult(value, ResultType.URL)
+        engine?.produceResult(value, ResultType.URL)
     }
 
     @JavascriptInterface
     fun result(value: String, type: String) {
         val t = runCatching { ResultType.valueOf(type.uppercase()) }.getOrDefault(ResultType.TEXT)
-        engine?.deliverResult(value, t)
+        engine?.produceResult(value, t)
     }
 
     @JavascriptInterface
     fun resultJson(json: String) {
         try {
             val obj = JSONObject(json)
-            val type = obj.optString("type", "JSON")
-            val value = obj.optString("value", json)
-            result(value, type)
+            result(obj.optString("value", json), obj.optString("type", "JSON"))
         } catch (_: Exception) {
-            engine?.deliverResult(json, ResultType.JSON)
+            engine?.produceResult(json, ResultType.JSON)
         }
+    }
+
+    @JavascriptInterface
+    fun complete() {
+        engine?.complete()
     }
 
     @JavascriptInterface
@@ -58,13 +62,16 @@ object ABC {
     }
 
     @JavascriptInterface
-    fun complete() {
-        engine?.deliverResult("", ResultType.EMPTY)
+    fun fail(code: String, message: String) {
+        engine?.fail("$code: $message")
     }
 
-    // Legacy
+    // Legacy: result + complete
     @JavascriptInterface
-    fun sendResult(url: String) = result(url)
+    fun sendResult(url: String) {
+        engine?.produceResult(url, ResultType.URL)
+        engine?.complete()
+    }
 
     @JavascriptInterface
     fun triggerCaptcha() = requestUserInteraction("CAPTCHA")

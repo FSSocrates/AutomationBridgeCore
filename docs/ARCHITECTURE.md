@@ -1,24 +1,18 @@
 # Architecture
 
-## Layer contracts
+## Layers
+- **JobManager path**: validate → persist → queue → worker
+- **AutomationEngine**: engine/job/phase state only (no Android)
+- **BrowserController**: disposable WebView per attempt
+- **Coordinator**: admission + orchestration
+- **IPC**: START / STATUS / CANCEL / RESUME
 
-| Layer | Knows | Must not know |
-|-------|-------|----------------|
-| AutomationEngine | jobs, states, events, policies | Context, WebView, Activity, Intents |
-| BrowserController | WebView load/execute/lifecycle | job state, notifications, IPC |
-| AutomationCoordinator | Engine ↔ Browser wiring | IPC details, UI widgets |
-| ABCForegroundService | IPC, notifications, host lifecycle | state-machine rules |
-| ManualInteractionActivity | present WebView for user | job validation |
+## States
+- Engine: STOPPED | IDLE | EXECUTING
+- Job: QUEUED | RUNNING | WAITING_FOR_USER | COMPLETED | FAILED | CANCELLED | INTERRUPTED
+- Phase: CREATED → VALIDATING → LOADING → EXECUTING → WAITING_FOR_USER → FINALIZING → COMPLETED
 
-## State transitions
-
-| From | Command | To |
-|------|---------|-----|
-| IDLE | StartJob | RUNNING |
-| RUNNING | RequestUserInteraction | WAITING_FOR_USER |
-| WAITING_FOR_USER | Resume | RUNNING |
-| RUNNING | DeliverResult | COMPLETED → IDLE |
-| RUNNING / WAITING_FOR_USER | Fail | FAILED → IDLE |
-| RUNNING / WAITING_FOR_USER | Cancel | CANCELLED → IDLE |
-
-All other transitions are rejected.
+## Invariants
+- One active WebView execution; WAITING_FOR_USER holds the slot
+- Retry = destroy WebView + new attempt
+- `result` ≠ `complete`

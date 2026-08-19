@@ -1,17 +1,12 @@
 # Changelog
 
-## 0.5.1
-- JobQueue drained after terminal state
-- RetryPolicy wired into coordinator
-- DurableJobStore (SharedPreferences snapshot)
-- maven-publish on :core
-- androidTest smoke test
+## 0.6.0
+- EngineState / JobState / ExecutionPhase separation
+- SubmitResult Accepted|Rejected
+- Queue-authoritative submit + pump
+- result() does not complete; complete() explicit
+- Fresh WebView on retry
+- JAVASCRIPT_API.md, ROADMAP.md
 
-## 0.5.0
-- JobQueue, RetryPolicy types, sample client UI
-
-## 0.4.0
-- IPC v1, timeouts, UserInteractionController
-
-## 0.3.0 – 0.1.0
-- See prior tags
+## 0.5.x
+- Queue, retry, durable store, sample client
