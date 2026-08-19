@@ -1,101 +1,63 @@
 # AutomationBridgeCore (ABC)
 
-Open-source Android library / utility for processing web workflows via IPC Intents and an off-screen WebView running inside a Foreground Service.
+**Android automation engine** that lets authorized apps submit web-automation jobs to a background WebView, run controlled JavaScript workflows, request user interaction when needed, and receive structured results.
 
-**Package:** `com.fssocrates.abc`  
-**Min SDK:** 26  
-**UI:** 100% Jetpack Compose (Material3)  
-**License:** Apache License 2.0
+> CAPTCHA / Cloudflare / login / OTP are just reasons for `WAITING_FOR_USER` — not the core concept.
 
-## Architecture
+## Architecture (v0.2)
 
-1. Caller apps send an Intent containing `EXTRA_TARGET_URL` + `EXTRA_SCRIPT`.
-2. `ABCForegroundService` hosts a shared `WebView` (via `ABCWebViewHolder`).
-3. On page load the supplied JS is evaluated. The page may call:
-   - `ABC.sendResult(url)` → result is broadcast as `ACTION_LINK_EXTRACTED`
-   - `ABC.triggerCaptcha()` → notification upgrades to high-priority heads-up
-4. User taps the notification → `SolverActivity` mounts the live WebView with Compose `AndroidView`.
-5. After verification the activity finishes, WebView returns to background, notification downgrades, engine continues.
-
-## Setup
-
-```kotlin
-// settings.gradle.kts / build.gradle.kts already configured for Compose BOM + Material3
+```
+AutomationEngine (core)
+       │
+  AutomationJob + State Machine
+       │
+ ┌─────┼─────┐
+ ▼     ▼     ▼
+WebView  UserInteraction  Result/IPC
 ```
 
-Clone and open in Android Studio. Grant notification permission on Android 13+.
+- **Single-job**: one active job at a time; concurrent submits are rejected.
+- **core/** module: pure engine, jobs, events, policies (unit-testable).
+- **app/**: Android host (Service, WebView, Compose Solver UI) + demo.
 
-## Caller App IPC Example
+## States
+
+`IDLE → RUNNING → WAITING_FOR_USER → RUNNING → COMPLETED | FAILED | CANCELLED`
+
+## JS Bridge (`ABC`)
+
+```js
+ABC.result(url)
+ABC.resultJson(JSON.stringify({type:"download", value: url}))
+ABC.requestUserInteraction("captcha")   // or "login", "otp", "consent", ...
+ABC.log("debug")
+ABC.fail("reason")
+ABC.complete()
+```
+
+Legacy: `ABC.sendResult` / `ABC.triggerCaptcha` still work.
+
+## IPC (caller)
 
 ```kotlin
-val intent = Intent().apply {
-    setClassName(
-        "com.fssocrates.abc",
-        "com.fssocrates.abc.ABCForegroundService"
-    )
-    putExtra("com.fssocrates.abc.EXTRA_TARGET_URL", "https://target.example")
-    putExtra(
-        "com.fssocrates.abc.EXTRA_SCRIPT",
-        """
-        // your extraction logic
-        const link = document.querySelector('a.download')?.href;
-        if (link) ABC.sendResult(link);
-        else ABC.triggerCaptcha();
-        """.trimIndent()
-    )
+val i = Intent(ABCForegroundService.ACTION_START_JOB).apply {
+  setClassName("com.fssocrates.abc", "com.fssocrates.abc.ABCForegroundService")
+  putExtra(ABCForegroundService.EXTRA_TARGET_URL, "https://example.com")
+  putExtra(ABCForegroundService.EXTRA_SCRIPT, "/* script */")
 }
-context.startForegroundService(intent)
+// Requires signature permission com.fssocrates.abc.permission.USE_ENGINE
+startForegroundService(i)
 ```
 
-Listen for results:
+Listen: `ACTION_LINK_EXTRACTED` / `ACTION_JOB_EVENT` with `EXTRA_JOB_ID`.
 
-```kotlin
-val filter = IntentFilter("com.fssocrates.abc.ACTION_LINK_EXTRACTED")
-registerReceiver(object : BroadcastReceiver() {
-    override fun onReceive(c: Context?, i: Intent?) {
-        val url = i?.getStringExtra("com.fssocrates.abc.EXTRA_RESULT_URL")
-        // handle url
-    }
-}, filter)
-```
+## Modules
 
-## Key Classes
-
-| File | Role |
-|------|------|
-| `ABC.kt` | `@JavascriptInterface` bridge (`sendResult`, `triggerCaptcha`) |
-| `ABCWebViewHolder.kt` | Thread-safe singleton WebView + state flows |
-| `ABCForegroundService.kt` | Foreground engine, intent handling, JS eval |
-| `ABCNotificationManager.kt` | Low / High priority notification channels |
-| `SolverActivity.kt` / `SolverScreen.kt` | Compose UI that attaches the live WebView |
-
-## Permissions
-
-- `INTERNET`
-- `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC`
-- `POST_NOTIFICATIONS` (Android 13+)
+| Module | Role |
+|--------|------|
+| `:core` | AutomationEngine, Job, State, Events, Policies |
+| `:app`  | Service, WebView holder, Notifications, Solver UI, demo |
 
 ## License
 
-Apache License 2.0 – see [LICENSE](LICENSE).
-
-## Privacy & CAPTCHA Handling
-
-- Solver UI is shown only when `ABC.triggerCaptcha()` is called by the loaded page.
-- No page content, screenshots, or personal data is transmitted off-device by ABC itself.
-- User must explicitly tap the high-priority notification to open the verification screen (consent via interaction).
-- Callers are responsible for obtaining any additional user consent required by their use-case and for complying with site Terms of Service.
-
-## Security Notes
-
-- Service requires the custom permission `com.fssocrates.abc.permission.START_ENGINE`.
-- Only `http`/`https` URLs are accepted.
-- Incoming scripts are filtered against a denylist of dangerous patterns; prefer short, purpose-built extraction snippets.
-- WebView is created and destroyed only on the main thread; resources are released with `about:blank` + `destroy()`.
-
-## Intended Use
-
-ABC is a developer testing / automation bridge. Do not use it for:
-- Circumventing site terms of service
-- Automated account creation or credential stuffing
-- Any activity that violates applicable law
+Apache 2.0

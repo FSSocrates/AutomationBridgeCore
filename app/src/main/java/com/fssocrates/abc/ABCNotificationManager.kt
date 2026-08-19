@@ -19,32 +19,24 @@ object ABCNotificationManager {
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = context.getSystemService(NotificationManager::class.java)
-            val low = NotificationChannel(
-                CHANNEL_LOW,
-                context.getString(R.string.notification_channel_low),
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                setShowBadge(false)
-                enableVibration(false)
-                setSound(null, null)
-            }
-            val high = NotificationChannel(
-                CHANNEL_HIGH,
-                context.getString(R.string.notification_channel_high),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                setShowBadge(true)
-                enableVibration(true)
-            }
-            nm.createNotificationChannel(low)
-            nm.createNotificationChannel(high)
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_LOW, "ABC Engine", NotificationManager.IMPORTANCE_LOW).apply {
+                    setShowBadge(false); enableVibration(false); setSound(null, null)
+                }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_HIGH, "ABC Action Required", NotificationManager.IMPORTANCE_HIGH).apply {
+                    setShowBadge(true); enableVibration(true)
+                }
+            )
         }
     }
 
-    fun buildLowPriority(context: Context): Notification {
+    fun buildLowPriority(context: Context, jobId: String? = null): Notification {
+        val text = jobId?.let { "Job $it running…" } ?: "Processing web workflows…"
         return NotificationCompat.Builder(context, CHANNEL_LOW)
-            .setContentTitle(context.getString(R.string.notification_title_active))
-            .setContentText("Processing web workflows…")
+            .setContentTitle("ABC Engine Active")
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setOngoing(true)
             .setSilent(true)
@@ -53,39 +45,38 @@ object ABCNotificationManager {
             .build()
     }
 
-    fun buildHighPriority(context: Context): Notification {
+    fun buildHighPriority(context: Context, reason: String, jobId: String): Notification {
         val intent = Intent(context, SolverActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(ABCForegroundService.EXTRA_JOB_ID, jobId)
+            putExtra(ABCForegroundService.EXTRA_REASON, reason)
         }
         val pending = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
+            context, jobId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(context, CHANNEL_HIGH)
-            .setContentTitle(context.getString(R.string.notification_title_verify))
-            .setContentText(context.getString(R.string.notification_text_verify))
+            .setContentTitle("Action required")
+            .setContentText("$reason — Job $jobId. Tap to continue.")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pending)
-            .setAutoCancel(true) // dismisses on click
+            .setAutoCancel(true)
             .build()
     }
 
-    fun showLow(context: Context) {
-        val nm = context.getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID_LOW, buildLowPriority(context))
+    fun showLow(context: Context, jobId: String? = null) {
+        context.getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID_LOW, buildLowPriority(context, jobId))
     }
 
-    fun showHigh(context: Context) {
-        val nm = context.getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID_HIGH, buildHighPriority(context))
+    fun showHigh(context: Context, reason: String, jobId: String) {
+        context.getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID_HIGH, buildHighPriority(context, reason, jobId))
     }
 
     fun cancelHigh(context: Context) {
-        val nm = context.getSystemService(NotificationManager::class.java)
-        nm.cancel(NOTIFICATION_ID_HIGH)
+        context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID_HIGH)
     }
 }

@@ -13,4 +13,5 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "AutomationBridgeCore"
+include(":core")
 include(":app")

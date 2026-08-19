@@ -6,17 +6,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Callers must hold this permission to start the engine -->
     <permission
-        android:name="com.fssocrates.abc.permission.START_ENGINE"
-        android:protectionLevel="normal"
-        android:label="Start ABC Engine" />
+        android:name="com.fssocrates.abc.permission.USE_ENGINE"
+        android:protectionLevel="signature"
+        android:label="Use ABC Engine" />
 
     <application
-        android:icon="@mipmap/ic_launcher"
         android:name=".ABCApp"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
-        
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.ABC"
@@ -25,7 +23,7 @@
         <service
             android:name=".ABCForegroundService"
             android:exported="true"
-            android:permission="com.fssocrates.abc.permission.START_ENGINE"
+            android:permission="com.fssocrates.abc.permission.USE_ENGINE"
             android:foregroundServiceType="dataSync" />
 
         <activity

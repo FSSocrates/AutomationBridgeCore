@@ -3,51 +3,81 @@ package com.fssocrates.abc
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import java.net.URI
+import com.fssocrates.abc.core.AutomationEngine
+import com.fssocrates.abc.core.AutomationEvent
+import com.fssocrates.abc.core.AutomationJob
+import com.fssocrates.abc.core.AutomationState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class ABCForegroundService : Service() {
 
     companion object {
+        const val ACTION_START_JOB = "com.fssocrates.abc.ACTION_START_JOB"
+        const val ACTION_CANCEL_JOB = "com.fssocrates.abc.ACTION_CANCEL_JOB"
+        const val EXTRA_JOB_ID = "com.fssocrates.abc.EXTRA_JOB_ID"
         const val EXTRA_TARGET_URL = "com.fssocrates.abc.EXTRA_TARGET_URL"
         const val EXTRA_SCRIPT = "com.fssocrates.abc.EXTRA_SCRIPT"
         const val ACTION_LINK_EXTRACTED = "com.fssocrates.abc.ACTION_LINK_EXTRACTED"
+        const val ACTION_JOB_EVENT = "com.fssocrates.abc.ACTION_JOB_EVENT"
         const val EXTRA_RESULT_URL = "com.fssocrates.abc.EXTRA_RESULT_URL"
-        private const val TAG = "ABCForegroundService"
-        private val ALLOWED_SCHEMES = setOf("https", "http")
+        const val EXTRA_EVENT = "com.fssocrates.abc.EXTRA_EVENT"
+        const val EXTRA_REASON = "com.fssocrates.abc.EXTRA_REASON"
     }
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val engine = AutomationEngine()
     private var pendingScript: String? = null
-    private var targetUrl: String? = null
 
     override fun onCreate() {
         super.onCreate()
+        ABC.engine = engine
         ABCNotificationManager.createChannels(this)
         startForeground(
             ABCNotificationManager.NOTIFICATION_ID_LOW,
             ABCNotificationManager.buildLowPriority(this)
         )
         setupWebView()
+        observeEvents()
+    }
+
+    private fun observeEvents() {
+        scope.launch {
+            engine.events.collectLatest { event ->
+                when (event) {
+                    is AutomationEvent.UserInteractionRequired -> {
+                        ABCWebViewHolder.setNeedsVerification(true)
+                        ABCNotificationManager.showHigh(this@ABCForegroundService, event.reason, event.jobId)
+                    }
+                    is AutomationEvent.Result -> broadcastResult(event)
+                    is AutomationEvent.Failed,
+                    is AutomationEvent.Completed,
+                    is AutomationEvent.Cancelled -> {
+                        ABCNotificationManager.cancelHigh(this@ABCForegroundService)
+                        ABCWebViewHolder.setNeedsVerification(false)
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     private fun setupWebView() {
         val wv = ABCWebViewHolder.getOrCreate(this)
-        ABC.resultCallback = { url -> broadcastResult(url) }
-        ABC.captchaCallback = {
-            ABCWebViewHolder.setNeedsVerification(true)
-            ABCNotificationManager.showHigh(this)
-        }
         wv.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                url?.let { engine.onPageLoaded(it) }
                 pendingScript?.let { script ->
-                    // Only evaluate if script passed basic sanitization
-                    if (isScriptSafe(script)) {
+                    if (engine.isScriptAllowed(script)) {
                         view?.evaluateJavascript(script, null)
-                    } else {
-                        Log.w(TAG, "Rejected unsafe script")
                     }
                     pendingScript = null
                 }
@@ -56,76 +86,70 @@ class ABCForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        intent ?: return START_STICKY
-        val url = intent.getStringExtra(EXTRA_TARGET_URL)
-        val script = intent.getStringExtra(EXTRA_SCRIPT)
-
-        if (url.isNullOrBlank() || !isUrlSafe(url)) {
-            Log.w(TAG, "Rejected invalid or unsafe URL: $url")
-            return START_STICKY
+        when (intent?.action) {
+            ACTION_CANCEL_JOB -> {
+                engine.cancel()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_START_JOB, null -> {
+                val url = intent?.getStringExtra(EXTRA_TARGET_URL)
+                val script = intent?.getStringExtra(EXTRA_SCRIPT)
+                if (url.isNullOrBlank()) {
+                    Timber.w("Missing target URL")
+                    return START_NOT_STICKY
+                }
+                val job = AutomationJob(targetUrl = url, script = script)
+                val accepted = engine.submit(job)
+                if (accepted == null) {
+                    Timber.w("Job rejected (busy or invalid)")
+                    broadcastEvent("JOB_REJECTED", job.id)
+                    return START_NOT_STICKY
+                }
+                pendingScript = script
+                if (!ABCWebViewHolder.isAttachedToUi.value) {
+                    ABCWebViewHolder.getOrCreate(this).loadUrl(url)
+                }
+            }
         }
-        if (script != null && !isScriptSafe(script)) {
-            Log.w(TAG, "Rejected unsafe script")
-            return START_STICKY
-        }
-
-        targetUrl = url
-        pendingScript = script
-        val wv = ABCWebViewHolder.getOrCreate(this)
-        if (!ABCWebViewHolder.isAttachedToUi.value) {
-            wv.loadUrl(url)
-        }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
-    /** Basic URL validation – only http/https, no javascript: etc. */
-    private fun isUrlSafe(url: String): Boolean {
-        return try {
-            val uri = URI(url.trim())
-            uri.scheme?.lowercase() in ALLOWED_SCHEMES && !uri.host.isNullOrBlank()
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    /**
-     * Basic script sanitization.
-     * Blocks obvious dangerous patterns. Prefer opcode-based commands in future.
-     */
-    private fun isScriptSafe(script: String): Boolean {
-        val lower = script.lowercase()
-        val blocked = listOf(
-            "eval(", "function(", "settimeout", "setinterval",
-            "xmlhttprequest", "fetch(", "import(", "require(",
-            "document.write", "innerhtml", "localstorage",
-            "sessionstorage", "indexeddb", "webkit", "chrome."
-        )
-        return blocked.none { lower.contains(it) } && script.length < 10_000
-    }
-
-    private fun broadcastResult(url: String) {
-        if (!isUrlSafe(url)) return
-        val result = Intent(ACTION_LINK_EXTRACTED).apply {
-            putExtra(EXTRA_RESULT_URL, url)
-        }
-        sendBroadcast(result)
-    }
-
-    fun resumeAfterVerification() {
-        ABCWebViewHolder.setNeedsVerification(false)
+    fun resumeAfterUserInteraction() {
+        engine.resumeAfterUserInteraction()
         ABCNotificationManager.cancelHigh(this)
+        ABCWebViewHolder.setNeedsVerification(false)
+        // Re-run pending script if any
         pendingScript?.let { script ->
-            if (isScriptSafe(script)) {
+            if (engine.isScriptAllowed(script)) {
                 ABCWebViewHolder.get()?.evaluateJavascript(script, null)
             }
             pendingScript = null
         }
     }
 
+    private fun broadcastResult(event: AutomationEvent.Result) {
+        sendBroadcast(Intent(ACTION_LINK_EXTRACTED).apply {
+            putExtra(EXTRA_JOB_ID, event.jobId)
+            putExtra(EXTRA_RESULT_URL, event.value)
+            putExtra(EXTRA_EVENT, "RESULT")
+        })
+    }
+
+    private fun broadcastEvent(type: String, jobId: String) {
+        sendBroadcast(Intent(ACTION_JOB_EVENT).apply {
+            putExtra(EXTRA_JOB_ID, jobId)
+            putExtra(EXTRA_EVENT, type)
+        })
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        engine.cancel()
+        ABC.engine = null
         ABCWebViewHolder.destroy()
+        scope.cancel()
         super.onDestroy()
     }
 }
