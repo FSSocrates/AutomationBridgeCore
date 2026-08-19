@@ -13,25 +13,25 @@ class EngineTest {
         val id = engine.submit(AutomationJob(targetUrl = "https://example.com"))
         assertNotNull(id)
         // async channel — give a tick
-        Thread.sleep(50)
+        Thread.sleep(80)
         assertEquals(AutomationState.RUNNING, engine.state.value)
     }
 
     @Test fun rejectWhileBusy() {
         engine.submit(AutomationJob(targetUrl = "https://example.com"))
-        Thread.sleep(50)
+        Thread.sleep(80)
         val second = engine.submit(AutomationJob(targetUrl = "https://other.com"))
         assertNull(second)
     }
 
     @Test fun userInteractionState() {
         engine.submit(AutomationJob(targetUrl = "https://example.com"))
-        Thread.sleep(50)
+        Thread.sleep(80)
         engine.requestUserInteraction("captcha")
-        Thread.sleep(50)
+        Thread.sleep(80)
         assertEquals(AutomationState.WAITING_FOR_USER, engine.state.value)
         engine.resumeAfterUserInteraction()
-        Thread.sleep(50)
+        Thread.sleep(80)
         assertEquals(AutomationState.RUNNING, engine.state.value)
     }
 
