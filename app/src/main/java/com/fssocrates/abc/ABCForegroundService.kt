@@ -7,23 +7,23 @@ import com.fssocrates.abc.core.AutomationEngine
 import com.fssocrates.abc.core.AutomationJob
 import timber.log.Timber
 
-/** Android host for AutomationCoordinator. IPC adapter only. */
 class ABCForegroundService : Service() {
 
     companion object {
-        const val ACTION_START_JOB = "com.fssocrates.abc.ACTION_START_JOB"
-        const val ACTION_CANCEL_JOB = "com.fssocrates.abc.ACTION_CANCEL_JOB"
-        const val EXTRA_JOB_ID = "com.fssocrates.abc.EXTRA_JOB_ID"
-        const val EXTRA_TARGET_URL = "com.fssocrates.abc.EXTRA_TARGET_URL"
-        const val EXTRA_SCRIPT = "com.fssocrates.abc.EXTRA_SCRIPT"
-        const val ACTION_LINK_EXTRACTED = "com.fssocrates.abc.ACTION_LINK_EXTRACTED"
-        const val ACTION_JOB_EVENT = "com.fssocrates.abc.ACTION_JOB_EVENT"
-        const val EXTRA_RESULT_URL = "com.fssocrates.abc.EXTRA_RESULT_URL"
-        const val EXTRA_EVENT = "com.fssocrates.abc.EXTRA_EVENT"
-        const val EXTRA_REASON = "com.fssocrates.abc.EXTRA_REASON"
+        const val ACTION_START_JOB = IpcProtocol.ACTION_START
+        const val ACTION_CANCEL_JOB = IpcProtocol.ACTION_CANCEL
+        const val EXTRA_JOB_ID = IpcProtocol.EXTRA_JOB_ID
+        const val EXTRA_TARGET_URL = IpcProtocol.EXTRA_TARGET_URL
+        const val EXTRA_SCRIPT = IpcProtocol.EXTRA_SCRIPT
+        const val ACTION_LINK_EXTRACTED = IpcProtocol.BROADCAST_RESULT
+        const val ACTION_JOB_EVENT = IpcProtocol.BROADCAST_EVENT
+        const val EXTRA_RESULT_URL = IpcProtocol.EXTRA_RESULT_URL
+        const val EXTRA_EVENT = IpcProtocol.EXTRA_EVENT
+        const val EXTRA_REASON = IpcProtocol.EXTRA_REASON
     }
 
     private lateinit var coordinator: AutomationCoordinator
+    private lateinit var userInteraction: UserInteractionController
 
     override fun onCreate() {
         super.onCreate()
@@ -32,61 +32,69 @@ class ABCForegroundService : Service() {
             ABCNotificationManager.NOTIFICATION_ID_LOW,
             ABCNotificationManager.buildLowPriority(this)
         )
-        val engine = AutomationEngine()
-        val browser = AndroidBrowserController(this)
-        coordinator = AutomationCoordinator(engine, browser)
-        coordinator.onUserInteractionRequired = { jobId, reason, _ ->
-            ABCWebViewHolder.setNeedsVerification(true)
-            ABCNotificationManager.showHigh(this, reason, jobId)
+        userInteraction = UserInteractionController(this)
+        coordinator = AutomationCoordinator(AutomationEngine(), AndroidBrowserController(this))
+        coordinator.onUserInteractionRequired = { jobId, reason, message ->
+            userInteraction.request(jobId, reason, message)
         }
         coordinator.onResult = { jobId, value, type ->
-            sendBroadcast(Intent(ACTION_LINK_EXTRACTED).apply {
-                putExtra(EXTRA_JOB_ID, jobId)
-                putExtra(EXTRA_RESULT_URL, value)
-                putExtra(EXTRA_EVENT, type)
+            sendBroadcast(Intent(IpcProtocol.BROADCAST_RESULT).apply {
+                putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
+                putExtra(IpcProtocol.EXTRA_JOB_ID, jobId)
+                putExtra(IpcProtocol.EXTRA_RESULT_URL, value)
+                putExtra(IpcProtocol.EXTRA_EVENT, type)
             })
         }
-        coordinator.onTerminal = { jobId, status ->
-            ABCNotificationManager.cancelHigh(this)
-            ABCWebViewHolder.setNeedsVerification(false)
-            sendBroadcast(Intent(ACTION_JOB_EVENT).apply {
-                putExtra(EXTRA_JOB_ID, jobId)
-                putExtra(EXTRA_EVENT, status)
+        coordinator.onTerminal = { jobId, status, errorCode, errorMessage ->
+            userInteraction.dismiss()
+            sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
+                putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
+                putExtra(IpcProtocol.EXTRA_JOB_ID, jobId)
+                putExtra(IpcProtocol.EXTRA_EVENT, status)
+                putExtra(IpcProtocol.EXTRA_STATUS, status)
+                errorCode?.let { putExtra(IpcProtocol.EXTRA_ERROR_CODE, it) }
+                errorMessage?.let { putExtra(IpcProtocol.EXTRA_ERROR_MESSAGE, it) }
             })
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_CANCEL_JOB -> {
+            IpcProtocol.ACTION_CANCEL, ACTION_CANCEL_JOB -> {
                 coordinator.cancel()
                 stopSelf()
             }
-            ACTION_START_JOB, null -> {
-                val url = intent?.getStringExtra(EXTRA_TARGET_URL)
+            IpcProtocol.ACTION_STATUS -> {
+                val (id, status) = coordinator.status()
+                sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
+                    putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
+                    putExtra(IpcProtocol.EXTRA_JOB_ID, id)
+                    putExtra(IpcProtocol.EXTRA_STATUS, status)
+                    putExtra(IpcProtocol.EXTRA_EVENT, "STATUS")
+                })
+            }
+            IpcProtocol.ACTION_START, ACTION_START_JOB, null -> {
+                val url = intent?.getStringExtra(IpcProtocol.EXTRA_TARGET_URL)
+                    ?: intent?.getStringExtra(EXTRA_TARGET_URL)
                 if (url.isNullOrBlank()) {
                     Timber.w("Missing target URL")
                     return START_NOT_STICKY
                 }
-                val script = intent.getStringExtra(EXTRA_SCRIPT)
+                val script = intent.getStringExtra(IpcProtocol.EXTRA_SCRIPT)
+                    ?: intent.getStringExtra(EXTRA_SCRIPT)
                 val job = AutomationJob(targetUrl = url, script = script)
                 val id = coordinator.start(job)
                 if (id == null) {
-                    Timber.w("Job rejected")
-                    sendBroadcast(Intent(ACTION_JOB_EVENT).apply {
-                        putExtra(EXTRA_JOB_ID, job.id)
-                        putExtra(EXTRA_EVENT, "JOB_REJECTED")
+                    sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
+                        putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
+                        putExtra(IpcProtocol.EXTRA_JOB_ID, job.id)
+                        putExtra(IpcProtocol.EXTRA_EVENT, "JOB_REJECTED")
+                        putExtra(IpcProtocol.EXTRA_ERROR_CODE, "ENGINE_BUSY_OR_INVALID")
                     })
                 }
             }
         }
         return START_NOT_STICKY
-    }
-
-    fun resumeAfterUserInteraction() {
-        coordinator.resume()
-        ABCNotificationManager.cancelHigh(this)
-        ABCWebViewHolder.setNeedsVerification(false)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

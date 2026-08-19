@@ -4,27 +4,30 @@ import android.content.Context
 import android.content.Intent
 import com.fssocrates.abc.core.AutomationJob
 
-/** Public entry point for callers. Hides service implementation. */
 object AutomationBridge {
+    const val PROTOCOL_VERSION = IpcProtocol.VERSION
 
     fun start(context: Context, url: String, script: String? = null) {
-        val i = Intent(context, ABCForegroundService::class.java).apply {
-            action = ABCForegroundService.ACTION_START_JOB
-            putExtra(ABCForegroundService.EXTRA_TARGET_URL, url)
-            putExtra(ABCForegroundService.EXTRA_SCRIPT, script)
-        }
-        context.startForegroundService(i)
+        context.startForegroundService(Intent(context, ABCForegroundService::class.java).apply {
+            action = IpcProtocol.ACTION_START
+            putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
+            putExtra(IpcProtocol.EXTRA_TARGET_URL, url)
+            putExtra(IpcProtocol.EXTRA_SCRIPT, script)
+        })
     }
 
-    fun start(context: Context, job: AutomationJob) {
-        start(context, job.targetUrl, job.script)
-    }
+    fun start(context: Context, job: AutomationJob) = start(context, job.targetUrl, job.script)
 
     fun cancel(context: Context, jobId: String? = null) {
-        val i = Intent(context, ABCForegroundService::class.java).apply {
-            action = ABCForegroundService.ACTION_CANCEL_JOB
-            jobId?.let { putExtra(ABCForegroundService.EXTRA_JOB_ID, it) }
-        }
-        context.startService(i)
+        context.startService(Intent(context, ABCForegroundService::class.java).apply {
+            action = IpcProtocol.ACTION_CANCEL
+            jobId?.let { putExtra(IpcProtocol.EXTRA_JOB_ID, it) }
+        })
+    }
+
+    fun status(context: Context) {
+        context.startService(Intent(context, ABCForegroundService::class.java).apply {
+            action = IpcProtocol.ACTION_STATUS
+        })
     }
 }

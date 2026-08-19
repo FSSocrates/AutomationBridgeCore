@@ -38,6 +38,13 @@ object ABCWebViewHolder {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.databaseEnabled = true
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
+                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                // Debugging must stay off in release builds
+                if (com.fssocrates.abc.BuildConfig.DEBUG) {
+                    android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+                }
                 addJavascriptInterface(ABC, "ABC")
                 webViewClient = object : WebViewClient() {}
                 webView = this
