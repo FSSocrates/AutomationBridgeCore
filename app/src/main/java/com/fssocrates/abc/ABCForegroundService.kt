@@ -1,10 +1,13 @@
 package com.fssocrates.abc
 
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import com.fssocrates.abc.core.AutomationEngine
 import com.fssocrates.abc.core.AutomationJob
+import com.fssocrates.abc.core.SubmitResult
 import timber.log.Timber
 
 class ABCForegroundService : Service() {
@@ -24,9 +27,12 @@ class ABCForegroundService : Service() {
 
     private lateinit var coordinator: AutomationCoordinator
     private lateinit var userInteraction: UserInteractionController
+    private lateinit var durable: DurableJobStore
 
     override fun onCreate() {
         super.onCreate()
+        durable = DurableJobStore(this)
+        Recovery.onServiceStart(durable)
         ABCNotificationManager.createChannels(this)
         startForeground(
             ABCNotificationManager.NOTIFICATION_ID_LOW,
@@ -34,11 +40,12 @@ class ABCForegroundService : Service() {
         )
         userInteraction = UserInteractionController(this)
         coordinator = AutomationCoordinator(AutomationEngine(), AndroidBrowserController(this))
-        coordinator.durableStore = DurableJobStore(this)
-        coordinator.onUserInteractionRequired = { jobId, reason, message ->
-            userInteraction.request(jobId, reason, message)
+        coordinator.durableStore = durable
+        coordinator.onUserInteractionRequired = { jobId, reason, _ ->
+            userInteraction.request(jobId, reason, null)
         }
         coordinator.onResult = { jobId, value, type ->
+            ResultRouter.deliver(this, jobId, value, type, "RESULT")
             sendBroadcast(Intent(IpcProtocol.BROADCAST_RESULT).apply {
                 putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
                 putExtra(IpcProtocol.EXTRA_JOB_ID, jobId)
@@ -48,6 +55,8 @@ class ABCForegroundService : Service() {
         }
         coordinator.onTerminal = { jobId, status, errorCode, errorMessage ->
             userInteraction.dismiss()
+            ResultRouter.deliver(this, jobId, null, status, status)
+            ResultRouter.unregister(jobId)
             sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
                 putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
                 putExtra(IpcProtocol.EXTRA_JOB_ID, jobId)
@@ -64,6 +73,9 @@ class ABCForegroundService : Service() {
             IpcProtocol.ACTION_CANCEL, ACTION_CANCEL_JOB -> {
                 coordinator.cancel()
                 stopSelf()
+            }
+            IpcProtocol.ACTION_RESUME -> {
+                coordinator.resume()
             }
             IpcProtocol.ACTION_STATUS -> {
                 val (id, status) = coordinator.status()
@@ -84,11 +96,21 @@ class ABCForegroundService : Service() {
                 val script = intent?.getStringExtra(IpcProtocol.EXTRA_SCRIPT)
                     ?: intent?.getStringExtra(EXTRA_SCRIPT)
                 val job = AutomationJob(targetUrl = url, script = script)
+                val pi = if (Build.VERSION.SDK_INT >= 33) {
+                    intent?.getParcelableExtra(
+                        IpcProtocol.EXTRA_RESULT_PENDING_INTENT,
+                        PendingIntent::class.java
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent?.getParcelableExtra(IpcProtocol.EXTRA_RESULT_PENDING_INTENT)
+                }
                 when (val result = coordinator.submit(job)) {
-                    is com.fssocrates.abc.core.SubmitResult.Accepted -> {
+                    is SubmitResult.Accepted -> {
+                        pi?.let { ResultRouter.register(result.jobId, it) }
                         Timber.i("Accepted %s", result.jobId)
                     }
-                    is com.fssocrates.abc.core.SubmitResult.Rejected -> {
+                    is SubmitResult.Rejected -> {
                         sendBroadcast(Intent(IpcProtocol.BROADCAST_EVENT).apply {
                             putExtra(IpcProtocol.EXTRA_PROTOCOL_VERSION, IpcProtocol.VERSION)
                             putExtra(IpcProtocol.EXTRA_JOB_ID, job.id)

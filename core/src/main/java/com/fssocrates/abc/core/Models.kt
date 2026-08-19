@@ -22,7 +22,9 @@ data class AutomationJob(
     val targetUrl: String,
     val script: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    var attempt: Int = 1
+    var attempt: Int = 1,
+    /** Optional opaque callback key for result routing. */
+    val callbackKey: String? = null
 )
 
 data class AutomationResult(

@@ -7,6 +7,8 @@ object IpcProtocol {
     const val ACTION_START = "com.fssocrates.abc.ACTION_START_JOB"
     const val ACTION_CANCEL = "com.fssocrates.abc.ACTION_CANCEL_JOB"
     const val ACTION_STATUS = "com.fssocrates.abc.ACTION_STATUS"
+    const val ACTION_RESUME = "com.fssocrates.abc.ACTION_RESUME"
+    const val EXTRA_RESULT_PENDING_INTENT = "com.fssocrates.abc.EXTRA_RESULT_PENDING_INTENT"
 
     const val EXTRA_PROTOCOL_VERSION = "com.fssocrates.abc.EXTRA_PROTOCOL_VERSION"
     const val EXTRA_JOB_ID = "com.fssocrates.abc.EXTRA_JOB_ID"

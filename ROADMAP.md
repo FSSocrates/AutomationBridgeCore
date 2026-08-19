@@ -1,13 +1,13 @@
 # Roadmap
 
-- [x] Core engine, bridge, coordinator
-- [x] Separate engine / job / phase state
-- [x] SubmitResult (Accepted / Rejected)
-- [x] Queue-authoritative admission
+- [x] Core engine, coordinator, bridge
+- [x] Engine / job / phase separation
+- [x] SubmitResult + queue admission
 - [x] result vs complete
-- [x] Fresh WebView per attempt (stop/destroy on retry)
-- [x] User interaction, IPC v1, durable snapshot
-- [ ] Process-death recovery (INTERRUPTED → retry policy)
-- [ ] Request-specific PendingIntent results
-- [ ] Full E2E matrix on emulator
+- [x] Fresh WebView on retry
+- [x] User interaction + IPC v1
+- [x] Process-death → INTERRUPTED
+- [x] Request-specific PendingIntent results
+- [x] ACTION_RESUME
+- [ ] Emulator E2E matrix in CI
 - [ ] 1.0 API freeze

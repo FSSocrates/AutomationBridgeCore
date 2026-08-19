@@ -1,62 +1,42 @@
 # AutomationBridgeCore (ABC)
 
-**Android automation engine** that lets authorized apps submit web-automation jobs to a background WebView, run controlled JavaScript workflows, request user interaction when needed, and receive structured results.
+Small **Android-native automation runtime**: authorized apps submit web jobs to a single WebView session, optionally involve a human, and receive deterministic results via IPC.
 
-> CAPTCHA / Cloudflare / login / OTP are just reasons for `WAITING_FOR_USER` — not the core concept.
+Not an AI browser agent or Playwright clone.
 
-## Architecture (v0.2)
+## Flow
 
 ```
-AutomationEngine (core)
-       │
-  AutomationJob + State Machine
-       │
- ┌─────┼─────┐
- ▼     ▼     ▼
-WebView  UserInteraction  Result/IPC
+App → Intent/Binder → Queue → Coordinator → WebView → JS bridge
+                              ↓
+                    WAITING_FOR_USER → ManualInteractionActivity
+                              ↓
+                           result / complete
 ```
 
-- **Single-job**: one active job at a time; concurrent submits are rejected.
-- **core/** module: pure engine, jobs, events, policies (unit-testable).
-- **app/**: Android host (Service, WebView, Compose Solver UI) + demo.
-
-## States
-
-`IDLE → RUNNING → WAITING_FOR_USER → RUNNING → COMPLETED | FAILED | CANCELLED`
-
-## JS Bridge (`ABC`)
-
-```js
-ABC.result(url)
-ABC.resultJson(JSON.stringify({type:"download", value: url}))
-ABC.requestUserInteraction("captcha")   // or "login", "otp", "consent", ...
-ABC.log("debug")
-ABC.fail("reason")
-ABC.complete()
-```
-
-Legacy: `ABC.sendResult` / `ABC.triggerCaptcha` still work.
-
-## IPC (caller)
+## Quick start (same-app)
 
 ```kotlin
-val i = Intent(ABCForegroundService.ACTION_START_JOB).apply {
-  setClassName("com.fssocrates.abc", "com.fssocrates.abc.ABCForegroundService")
-  putExtra(ABCForegroundService.EXTRA_TARGET_URL, "https://example.com")
-  putExtra(ABCForegroundService.EXTRA_SCRIPT, "/* script */")
-}
-// Requires signature permission com.fssocrates.abc.permission.USE_ENGINE
-startForegroundService(i)
+AutomationBridge.start(context, "https://example.com",
+  script = "ABC.result(location.href); ABC.complete();")
 ```
 
-Listen: `ACTION_LINK_EXTRACTED` / `ACTION_JOB_EVENT` with `EXTRA_JOB_ID`.
+## JS API v1
+
+See [docs/JAVASCRIPT_API.md](docs/JAVASCRIPT_API.md).  
+`result()` does **not** finish the job — call `complete()`.
+
+## IPC v1
+
+`START` / `CANCEL` / `STATUS` / `RESUME` — see [docs/API.md](docs/API.md).  
+Optional `EXTRA_RESULT_PENDING_INTENT` for request-specific results.
 
 ## Modules
 
 | Module | Role |
 |--------|------|
-| `:core` | AutomationEngine, Job, State, Events, Policies |
-| `:app`  | Service, WebView holder, Notifications, Solver UI, demo |
+| `:core` | Engine, jobs, queue, policies |
+| `:app` | Service, WebView, Compose UI, demo |
 
 ## License
 
