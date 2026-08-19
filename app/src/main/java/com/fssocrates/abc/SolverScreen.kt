@@ -4,7 +4,7 @@ import android.view.ViewGroup
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.Modifier.modifier
+import androidx.compose.ui.Modifier.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 
 @Composable

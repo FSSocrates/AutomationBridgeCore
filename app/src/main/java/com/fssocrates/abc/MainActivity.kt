@@ -33,9 +33,10 @@ class MainActivity : ComponentActivity() {
                             script = "ABC.result(window.location.href);"
                         )
                     }) { Text("Start demo job") }
-                    Button(onClick = {
-                        AutomationBridge.cancel(this@MainActivity)
-                    }, modifier = Modifier.padding(top = 8.dp)) { Text("Cancel") }
+                    Button(
+                        onClick = { AutomationBridge.cancel(this@MainActivity) },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Cancel") }
                 }
             }
         }
