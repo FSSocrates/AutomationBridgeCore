@@ -46,7 +46,7 @@ object ABCNotificationManager {
     }
 
     fun buildHighPriority(context: Context, reason: String, jobId: String): Notification {
-        val intent = Intent(context, SolverActivity::class.java).apply {
+        val intent = Intent(context, ManualInteractionActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(ABCForegroundService.EXTRA_JOB_ID, jobId)
             putExtra(ABCForegroundService.EXTRA_REASON, reason)

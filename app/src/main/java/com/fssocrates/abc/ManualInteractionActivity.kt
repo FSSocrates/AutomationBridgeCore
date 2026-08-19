@@ -15,7 +15,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.Modifier.Modifier
 import androidx.compose.ui.unit.dp
 
-class SolverActivity : ComponentActivity() {
+class ManualInteractionActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
