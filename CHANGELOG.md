@@ -1,19 +1,17 @@
 # Changelog
 
+## 0.5.1
+- JobQueue drained after terminal state
+- RetryPolicy wired into coordinator
+- DurableJobStore (SharedPreferences snapshot)
+- maven-publish on :core
+- androidTest smoke test
+
 ## 0.5.0
-- JobQueue (sequential), RetryPolicy
-- Sample client UI with live status/result
-- core version 0.4.0 metadata for future Maven publish
-- Queue + retry unit tests
+- JobQueue, RetryPolicy types, sample client UI
 
 ## 0.4.0
-- IPC v1, timeouts, UserInteractionController, JobStore, WebView harden
+- IPC v1, timeouts, UserInteractionController
 
-## 0.3.0
-- Coordinator, BrowserController, explicit transitions
-
-## 0.2.0
-- core module, engine foundation
-
-## 0.1.0
-- Initial
+## 0.3.0 – 0.1.0
+- See prior tags

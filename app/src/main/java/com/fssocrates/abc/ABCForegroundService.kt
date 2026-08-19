@@ -34,6 +34,7 @@ class ABCForegroundService : Service() {
         )
         userInteraction = UserInteractionController(this)
         coordinator = AutomationCoordinator(AutomationEngine(), AndroidBrowserController(this))
+        coordinator.durableStore = DurableJobStore(this)
         coordinator.onUserInteractionRequired = { jobId, reason, message ->
             userInteraction.request(jobId, reason, message)
         }
