@@ -27,7 +27,7 @@ jobs:
           chmod +x gradlew
           ./gradlew :core:assembleDebug :app:assembleDebug :app:testDebugUnitTest --stacktrace
       - name: Upload APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ABC-debug-apk
           path: app/build/outputs/apk/debug/*.apk
