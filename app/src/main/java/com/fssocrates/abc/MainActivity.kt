@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                             AutomationBridge.cancel(this@MainActivity)
                             statusText = "State: CANCELLED"
                         },
-                        modifier = androidx.compose.ui.modifier.Modifier.padding(top = 8.dp)
+                        modifier = androidx.compose.ui.Modifier.padding(top = 8.dp)
                     ) { Text("Cancel") }
                 }
             }
