@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      run_emulator:
+        description: 'Run emulator instrumented tests'
+        required: false
+        default: 'false'
 
 jobs:
   build:
@@ -17,7 +22,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - uses: android-actions/setup-android@v4
-      - name: Build & test
+      - name: Build & unit tests
         run: |
           chmod +x gradlew
           ./gradlew :core:assembleDebug :app:assembleDebug :app:testDebugUnitTest --stacktrace
@@ -27,6 +32,29 @@ jobs:
           name: ABC-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+  emulator:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.run_emulator == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: android-actions/setup-android@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instrumented smoke
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          script: ./gradlew :app:connectedDebugAndroidTest
 
   release:
     needs: build
@@ -44,9 +72,9 @@ jobs:
       - run: chmod +x gradlew && ./gradlew :app:assembleDebug
       - uses: softprops/action-gh-release@v3
         with:
-          tag_name: v0.2.${{ github.run_number }}
-          name: ABC v0.2.${{ github.run_number }}
+          tag_name: v1.0.${{ github.run_number }}
+          name: ABC v1.0.${{ github.run_number }}
           files: app/build/outputs/apk/debug/*.apk
-          prerelease: true
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

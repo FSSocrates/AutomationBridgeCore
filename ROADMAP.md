@@ -1,13 +1,11 @@
 # Roadmap
 
-- [x] Core engine, coordinator, bridge
+- [x] Deterministic single-session automation runtime
 - [x] Engine / job / phase separation
-- [x] SubmitResult + queue admission
-- [x] result vs complete
-- [x] Fresh WebView on retry
-- [x] User interaction + IPC v1
-- [x] Process-death → INTERRUPTED
-- [x] Request-specific PendingIntent results
-- [x] ACTION_RESUME
-- [ ] Emulator E2E matrix in CI
-- [ ] 1.0 API freeze
+- [x] Queue admission + SubmitResult
+- [x] result vs complete; JS API v1
+- [x] User interaction + IPC v1 + RESUME
+- [x] Recovery INTERRUPTED + PendingIntent results
+- [x] 1.0 API surface documented (MIGRATION.md)
+- [x] Emulator job available via workflow_dispatch
+- [x] 1.0.0 version bump

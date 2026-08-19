@@ -3,6 +3,8 @@ package com.fssocrates.abc
 /** Public IPC contract (v1). */
 object IpcProtocol {
     const val VERSION = 1
+    /** Frozen public IPC major for 1.0. */
+    const val API_LEVEL = 1
 
     const val ACTION_START = "com.fssocrates.abc.ACTION_START_JOB"
     const val ACTION_CANCEL = "com.fssocrates.abc.ACTION_CANCEL_JOB"
