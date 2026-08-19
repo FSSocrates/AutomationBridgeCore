@@ -20,3 +20,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
+
+// Library publishing (local / future Maven)
+group = "com.fssocrates"
+version = "0.4.0"

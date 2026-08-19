@@ -1,19 +1,19 @@
 # Changelog
 
+## 0.5.0
+- JobQueue (sequential), RetryPolicy
+- Sample client UI with live status/result
+- core version 0.4.0 metadata for future Maven publish
+- Queue + retry unit tests
+
 ## 0.4.0
-- IpcProtocol v1, status action, error codes in broadcasts
-- UserInteractionController
-- JobStore (in-memory)
-- Timeouts (overall + user interaction)
-- WebView hardening (no file/content access, mixed content blocked)
-- docs: API, WORKFLOW
+- IPC v1, timeouts, UserInteractionController, JobStore, WebView harden
 
 ## 0.3.0
-- Explicit transitions, BrowserController, Coordinator
-- AutomationError, AutomationOptions, test pages
+- Coordinator, BrowserController, explicit transitions
 
 ## 0.2.0
-- core module, engine, signature permission
+- core module, engine foundation
 
 ## 0.1.0
-- Initial release
+- Initial
