@@ -1,6 +1,5 @@
 package com.fssocrates.abc
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,7 +11,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.Modifier.Modifier
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
@@ -21,29 +20,22 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("AutomationBridgeCore", style = MaterialTheme.typography.headlineMedium)
-                    Text(
-                        "Background WebView engine for IPC automation.",
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
+                    Text("Demo host for the ABC engine", modifier = Modifier.padding(vertical = 16.dp))
                     Button(onClick = {
-                        val i = Intent(this@MainActivity, ABCForegroundService::class.java).apply {
-                            putExtra(ABCForegroundService.EXTRA_TARGET_URL, "https://example.com")
-                            putExtra(
-                                ABCForegroundService.EXTRA_SCRIPT,
-                                "ABC.sendResult(window.location.href);"
-                            )
-                        }
-                        startForegroundService(i)
-                    }) {
-                        Text("Start Demo Engine")
-                    }
+                        AutomationBridge.start(
+                            this@MainActivity,
+                            url = "https://example.com",
+                            script = "ABC.result(window.location.href);"
+                        )
+                    }) { Text("Start demo job") }
+                    Button(onClick = {
+                        AutomationBridge.cancel(this@MainActivity)
+                    }, modifier = Modifier.padding(top = 8.dp)) { Text("Cancel") }
                 }
             }
         }
