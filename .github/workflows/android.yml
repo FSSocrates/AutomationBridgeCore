@@ -16,13 +16,13 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: Build & test
         run: |
           chmod +x gradlew
           ./gradlew :core:assembleDebug :app:assembleDebug :app:testDebugUnitTest --stacktrace
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ABC-debug-apk
           path: app/build/outputs/apk/debug/*.apk
@@ -40,9 +40,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - run: chmod +x gradlew && ./gradlew :app:assembleDebug
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: v0.2.${{ github.run_number }}
           name: ABC v0.2.${{ github.run_number }}
