@@ -1,11 +1,13 @@
 package com.fssocrates.abc
 
 import android.webkit.JavascriptInterface
+import com.fssocrates.abc.core.ResultType
 import org.json.JSONObject
+import timber.log.Timber
 
 /**
- * JS bridge injected as "ABC".
- * Protocol: result / requestUserInteraction / log / fail / complete
+ * JS bridge protocol (injected as "ABC").
+ * Does not own state — forwards to AutomationEngine via [engine].
  */
 object ABC {
 
@@ -14,7 +16,13 @@ object ABC {
 
     @JavascriptInterface
     fun result(value: String) {
-        engine?.deliverResult(value, "URL")
+        engine?.deliverResult(value, ResultType.URL)
+    }
+
+    @JavascriptInterface
+    fun result(value: String, type: String) {
+        val t = runCatching { ResultType.valueOf(type.uppercase()) }.getOrDefault(ResultType.TEXT)
+        engine?.deliverResult(value, t)
     }
 
     @JavascriptInterface
@@ -23,9 +31,9 @@ object ABC {
             val obj = JSONObject(json)
             val type = obj.optString("type", "JSON")
             val value = obj.optString("value", json)
-            engine?.deliverResult(value, type)
+            result(value, type)
         } catch (_: Exception) {
-            engine?.deliverResult(json, "JSON")
+            engine?.deliverResult(json, ResultType.JSON)
         }
     }
 
@@ -41,7 +49,7 @@ object ABC {
 
     @JavascriptInterface
     fun log(message: String) {
-        timber.log.Timber.d("JS: %s", message)
+        Timber.d("JS: %s", message)
     }
 
     @JavascriptInterface
@@ -51,14 +59,13 @@ object ABC {
 
     @JavascriptInterface
     fun complete() {
-        // explicit complete without payload
-        engine?.deliverResult("", "EMPTY")
+        engine?.deliverResult("", ResultType.EMPTY)
     }
 
-    // Backward-compat aliases
+    // Legacy
     @JavascriptInterface
     fun sendResult(url: String) = result(url)
 
     @JavascriptInterface
-    fun triggerCaptcha() = requestUserInteraction("captcha")
+    fun triggerCaptcha() = requestUserInteraction("CAPTCHA")
 }
