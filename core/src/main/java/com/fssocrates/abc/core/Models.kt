@@ -68,3 +68,10 @@ sealed interface EngineCommand {
     data object Cancel : EngineCommand
     data object Reset : EngineCommand
 }
+
+data class AutomationOptions(
+    val pageLoadTimeoutMs: Long = 30_000,
+    val scriptTimeoutMs: Long = 60_000,
+    val userInteractionTimeoutMs: Long = 300_000,
+    val overallTimeoutMs: Long = 600_000
+)

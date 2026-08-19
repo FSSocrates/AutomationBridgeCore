@@ -1,0 +1,13 @@
+<!DOCTYPE html><html><body>
+<h1>Manual interaction test</h1>
+<p>Click Continue after opening solver.</p>
+<button id="go">Continue</button>
+<script>
+  if (window.ABC) {
+    ABC.requestUserInteraction("MANUAL_ACTION", "Click Continue");
+    document.getElementById("go").onclick = function() {
+      ABC.result(window.location.href, "URL");
+    };
+  }
+</script>
+</body></html>
