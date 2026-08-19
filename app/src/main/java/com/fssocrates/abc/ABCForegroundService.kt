@@ -81,8 +81,8 @@ class ABCForegroundService : Service() {
                     Timber.w("Missing target URL")
                     return START_NOT_STICKY
                 }
-                val script = intent.getStringExtra(IpcProtocol.EXTRA_SCRIPT)
-                    ?: intent.getStringExtra(EXTRA_SCRIPT)
+                val script = intent?.getStringExtra(IpcProtocol.EXTRA_SCRIPT)
+                    ?: intent?.getStringExtra(EXTRA_SCRIPT)
                 val job = AutomationJob(targetUrl = url, script = script)
                 val id = coordinator.start(job)
                 if (id == null) {

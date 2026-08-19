@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.ui.Modifier.Modifier
 import androidx.compose.ui.unit.dp
 
 class ManualInteractionActivity : ComponentActivity() {
@@ -28,14 +27,14 @@ class ManualInteractionActivity : ComponentActivity() {
                     topBar = { TopAppBar(title = { Text("Action required: $reason") }) }
                 ) { padding ->
                     Column(
-                        modifier = Modifier
+                        modifier = androidx.compose.ui.Modifier
                             .fillMaxSize()
                             .padding(padding)
                     ) {
                         SolverScreen()
                         Button(
                             onClick = { completeInteraction() },
-                            modifier = Modifier.padding(16.dp)
+                            modifier = androidx.compose.ui.Modifier.padding(16.dp)
                         ) {
                             Text("Done - Resume automation")
                         }

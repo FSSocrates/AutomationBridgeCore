@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier.modifier
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
@@ -61,34 +60,34 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("ABC Sample Client", style = MaterialTheme.typography.headlineMedium)
-                    Text(statusText, modifier = Modifier.padding(top = 16.dp))
-                    Text(resultText, modifier = Modifier.padding(top = 8.dp))
+                    Text(statusText, modifier = androidx.compose.ui.Modifier.padding(top = 16.dp))
+                    Text(resultText, modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
                     Button(
                         onClick = {
                             statusText = "State: STARTING"
                             AutomationBridge.start(
                                 this@MainActivity,
                                 url = "https://example.com",
-                                script = "ABC.result(window.location.href, 'URL');"
+                                script = "ABC.result(window.location.href, \'URL\');"
                             )
                         },
-                        modifier = Modifier.padding(top = 24.dp)
+                        modifier = androidx.compose.ui.Modifier.padding(top = 24.dp)
                     ) { Text("Start job") }
                     Button(
                         onClick = { AutomationBridge.status(this@MainActivity) },
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = androidx.compose.ui.Modifier.padding(top = 8.dp)
                     ) { Text("Status") }
                     Button(
                         onClick = {
                             AutomationBridge.cancel(this@MainActivity)
                             statusText = "State: CANCELLED"
                         },
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = androidx.compose.ui.modifier.Modifier.padding(top = 8.dp)
                     ) { Text("Cancel") }
                 }
             }
