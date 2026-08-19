@@ -28,7 +28,7 @@ class ABCForegroundService : Service() {
         super.onCreate()
         ABCNotificationManager.createChannels(this)
         startForeground(
-            ABCNotificationManager.NOTIFICATION_ID,
+            ABCNotificationManager.NOTIFICATION_ID_LOW,
             ABCNotificationManager.buildLowPriority(this)
         )
         setupWebView()

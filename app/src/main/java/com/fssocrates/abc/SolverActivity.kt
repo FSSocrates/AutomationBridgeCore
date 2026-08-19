@@ -17,13 +17,9 @@ class SolverActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     SolverScreen(
                         onVerificationComplete = {
-                            // Detach and resume background
                             ABCWebViewHolder.markAttachedToUi(false)
                             ABCWebViewHolder.setNeedsVerification(false)
-                            // Notify service to downgrade notification
-                            val svc = Intent(this, ABCForegroundService::class.java)
-                            // Service will handle via shared state; force low notification
-                            ABCNotificationManager.showLow(this)
+                            ABCNotificationManager.cancelHigh(this)
                             finish()
                         }
                     )
@@ -34,6 +30,7 @@ class SolverActivity : ComponentActivity() {
 
     override fun onDestroy() {
         ABCWebViewHolder.markAttachedToUi(false)
+        ABCNotificationManager.cancelHigh(this)
         super.onDestroy()
     }
 }

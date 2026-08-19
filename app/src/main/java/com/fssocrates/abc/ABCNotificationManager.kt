@@ -13,7 +13,8 @@ object ABCNotificationManager {
 
     const val CHANNEL_LOW = "abc_engine_low"
     const val CHANNEL_HIGH = "abc_engine_high"
-    const val NOTIFICATION_ID = 1001
+    const val NOTIFICATION_ID_LOW = 1001
+    const val NOTIFICATION_ID_HIGH = 1002
 
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -66,22 +67,25 @@ object ABCNotificationManager {
             .setContentTitle(context.getString(R.string.notification_title_verify))
             .setContentText(context.getString(R.string.notification_text_verify))
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pending)
-            .setFullScreenIntent(pending, true)
-            .setAutoCancel(false)
+            .setAutoCancel(true) // dismisses on click
             .build()
     }
 
     fun showLow(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, buildLowPriority(context))
+        nm.notify(NOTIFICATION_ID_LOW, buildLowPriority(context))
     }
 
     fun showHigh(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, buildHighPriority(context))
+        nm.notify(NOTIFICATION_ID_HIGH, buildHighPriority(context))
+    }
+
+    fun cancelHigh(context: Context) {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        nm.cancel(NOTIFICATION_ID_HIGH)
     }
 }
