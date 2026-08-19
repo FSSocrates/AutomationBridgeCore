@@ -59,7 +59,8 @@ class AutomationCoordinator(
         if (!engine.isUrlAllowed(job.targetUrl)) {
             return SubmitResult.Rejected(RejectReason.INVALID_URL)
         }
-        if (job.script != null && !engine.isScriptAllowed(job.script)) {
+        val script = job.script
+        if (script != null && !engine.isScriptAllowed(script)) {
             return SubmitResult.Rejected(RejectReason.SCRIPT_REJECTED)
         }
         if (queue.size() >= options.maxQueueSize) {
