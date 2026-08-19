@@ -2,6 +2,8 @@ package com.fssocrates.abc
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,10 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Thread-safe singleton holding the shared WebView instance.
- * Allows clean attach/detach between ForegroundService and SolverActivity.
+ * Thread-safe singleton holding the shared WebView.
+ * Create/destroy always on main thread to avoid native leaks.
  */
 object ABCWebViewHolder {
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     @Volatile
     private var webView: WebView? = null
@@ -25,12 +29,15 @@ object ABCWebViewHolder {
 
     @SuppressLint("SetJavaScriptEnabled")
     fun getOrCreate(context: Context): WebView {
-        return webView ?: synchronized(this) {
+        webView?.let { return it }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            throw IllegalStateException("WebView must be created on main thread")
+        }
+        return synchronized(this) {
             webView ?: WebView(context.applicationContext).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.databaseEnabled = true
-                settings.userAgentString = settings.userAgentString
                 addJavascriptInterface(ABC, "ABC")
                 webViewClient = object : WebViewClient() {}
                 webView = this
@@ -49,11 +56,26 @@ object ABCWebViewHolder {
     }
 
     fun destroy() {
-        synchronized(this) {
-            webView?.destroy()
+        val toDestroy = synchronized(this) {
+            val wv = webView
             webView = null
             _isAttachedToUi.value = false
             _needsVerification.value = false
+            wv
+        } ?: return
+
+        val cleanup = {
+            try {
+                toDestroy.stopLoading()
+                toDestroy.loadUrl("about:blank")
+                toDestroy.removeAllViews()
+                toDestroy.destroy()
+            } catch (_: Exception) { }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            cleanup()
+        } else {
+            mainHandler.post(cleanup)
         }
     }
 }

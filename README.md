@@ -78,3 +78,24 @@ registerReceiver(object : BroadcastReceiver() {
 ## License
 
 Apache License 2.0 – see [LICENSE](LICENSE).
+
+## Privacy & CAPTCHA Handling
+
+- Solver UI is shown only when `ABC.triggerCaptcha()` is called by the loaded page.
+- No page content, screenshots, or personal data is transmitted off-device by ABC itself.
+- User must explicitly tap the high-priority notification to open the verification screen (consent via interaction).
+- Callers are responsible for obtaining any additional user consent required by their use-case and for complying with site Terms of Service.
+
+## Security Notes
+
+- Service requires the custom permission `com.fssocrates.abc.permission.START_ENGINE`.
+- Only `http`/`https` URLs are accepted.
+- Incoming scripts are filtered against a denylist of dangerous patterns; prefer short, purpose-built extraction snippets.
+- WebView is created and destroyed only on the main thread; resources are released with `about:blank` + `destroy()`.
+
+## Intended Use
+
+ABC is a developer testing / automation bridge. Do not use it for:
+- Circumventing site terms of service
+- Automated account creation or credential stuffing
+- Any activity that violates applicable law

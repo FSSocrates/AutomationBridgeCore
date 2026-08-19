@@ -3,13 +3,10 @@ package com.fssocrates.abc
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import java.net.URI
 
 class ABCForegroundService : Service() {
 
@@ -18,9 +15,10 @@ class ABCForegroundService : Service() {
         const val EXTRA_SCRIPT = "com.fssocrates.abc.EXTRA_SCRIPT"
         const val ACTION_LINK_EXTRACTED = "com.fssocrates.abc.ACTION_LINK_EXTRACTED"
         const val EXTRA_RESULT_URL = "com.fssocrates.abc.EXTRA_RESULT_URL"
+        private const val TAG = "ABCForegroundService"
+        private val ALLOWED_SCHEMES = setOf("https", "http")
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var pendingScript: String? = null
     private var targetUrl: String? = null
 
@@ -36,9 +34,7 @@ class ABCForegroundService : Service() {
 
     private fun setupWebView() {
         val wv = ABCWebViewHolder.getOrCreate(this)
-        ABC.resultCallback = { url ->
-            broadcastResult(url)
-        }
+        ABC.resultCallback = { url -> broadcastResult(url) }
         ABC.captchaCallback = {
             ABCWebViewHolder.setNeedsVerification(true)
             ABCNotificationManager.showHigh(this)
@@ -47,7 +43,12 @@ class ABCForegroundService : Service() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 pendingScript?.let { script ->
-                    view?.evaluateJavascript(script, null)
+                    // Only evaluate if script passed basic sanitization
+                    if (isScriptSafe(script)) {
+                        view?.evaluateJavascript(script, null)
+                    } else {
+                        Log.w(TAG, "Rejected unsafe script")
+                    }
                     pendingScript = null
                 }
             }
@@ -56,34 +57,67 @@ class ABCForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent ?: return START_STICKY
-        targetUrl = intent.getStringExtra(EXTRA_TARGET_URL)
-        pendingScript = intent.getStringExtra(EXTRA_SCRIPT)
-        val url = targetUrl
-        if (!url.isNullOrBlank()) {
-            val wv = ABCWebViewHolder.getOrCreate(this)
-            if (!ABCWebViewHolder.isAttachedToUi.value) {
-                wv.loadUrl(url)
-            }
+        val url = intent.getStringExtra(EXTRA_TARGET_URL)
+        val script = intent.getStringExtra(EXTRA_SCRIPT)
+
+        if (url.isNullOrBlank() || !isUrlSafe(url)) {
+            Log.w(TAG, "Rejected invalid or unsafe URL: $url")
+            return START_STICKY
+        }
+        if (script != null && !isScriptSafe(script)) {
+            Log.w(TAG, "Rejected unsafe script")
+            return START_STICKY
+        }
+
+        targetUrl = url
+        pendingScript = script
+        val wv = ABCWebViewHolder.getOrCreate(this)
+        if (!ABCWebViewHolder.isAttachedToUi.value) {
+            wv.loadUrl(url)
         }
         return START_STICKY
     }
 
+    /** Basic URL validation – only http/https, no javascript: etc. */
+    private fun isUrlSafe(url: String): Boolean {
+        return try {
+            val uri = URI(url.trim())
+            uri.scheme?.lowercase() in ALLOWED_SCHEMES && !uri.host.isNullOrBlank()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Basic script sanitization.
+     * Blocks obvious dangerous patterns. Prefer opcode-based commands in future.
+     */
+    private fun isScriptSafe(script: String): Boolean {
+        val lower = script.lowercase()
+        val blocked = listOf(
+            "eval(", "function(", "settimeout", "setinterval",
+            "xmlhttprequest", "fetch(", "import(", "require(",
+            "document.write", "innerhtml", "localstorage",
+            "sessionstorage", "indexeddb", "webkit", "chrome."
+        )
+        return blocked.none { lower.contains(it) } && script.length < 10_000
+    }
+
     private fun broadcastResult(url: String) {
+        if (!isUrlSafe(url)) return
         val result = Intent(ACTION_LINK_EXTRACTED).apply {
             putExtra(EXTRA_RESULT_URL, url)
-            setPackage(packageName) // restrict if desired; remove for cross-app
         }
         sendBroadcast(result)
-        // Optionally stop after result
-        // stopSelf()
     }
 
     fun resumeAfterVerification() {
         ABCWebViewHolder.setNeedsVerification(false)
-        ABCNotificationManager.showLow(this)
-        // Re-evaluate any pending script if needed
+        ABCNotificationManager.cancelHigh(this)
         pendingScript?.let { script ->
-            ABCWebViewHolder.get()?.evaluateJavascript(script, null)
+            if (isScriptSafe(script)) {
+                ABCWebViewHolder.get()?.evaluateJavascript(script, null)
+            }
             pendingScript = null
         }
     }
@@ -91,7 +125,6 @@ class ABCForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        scope.cancel()
         ABCWebViewHolder.destroy()
         super.onDestroy()
     }
