@@ -1,3 +1,7 @@
+## 1.2.1
+- Queue stress tests
+- RELEASE.md, CONTRIBUTING.md
+
 ## 1.2.0
 - Demo client URL/script fields
 - Maven publish to local build/repo
