@@ -73,8 +73,10 @@ class ABCForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             IpcProtocol.ACTION_CANCEL, ACTION_CANCEL_JOB -> {
-                coordinator.cancel()
-                stopSelf()
+                val jobId = intent.getStringExtra(IpcProtocol.EXTRA_JOB_ID)
+                    ?: intent.getStringExtra(EXTRA_JOB_ID)
+                coordinator.cancel(jobId)
+                if (jobId == null) stopSelf()
             }
             IpcProtocol.ACTION_RESUME -> {
                 coordinator.resume()
