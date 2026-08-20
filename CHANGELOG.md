@@ -1,3 +1,8 @@
+## 1.1.0
+- AutomationJobManager owns queue/records
+- Coordinator is execution-only
+- LIFECYCLE.md + JobManager tests
+
 # Changelog
 
 ## 1.0.0

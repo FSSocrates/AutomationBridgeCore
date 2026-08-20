@@ -3,11 +3,9 @@ package com.fssocrates.abc
 import com.fssocrates.abc.core.AutomationEngine
 import com.fssocrates.abc.core.AutomationEvent
 import com.fssocrates.abc.core.AutomationJob
+import com.fssocrates.abc.core.AutomationJobManager
 import com.fssocrates.abc.core.AutomationOptions
-import com.fssocrates.abc.core.EngineState
-import com.fssocrates.abc.core.JobQueue
-import com.fssocrates.abc.core.JobStore
-import com.fssocrates.abc.core.RejectReason
+import com.fssocrates.abc.core.JobState
 import com.fssocrates.abc.core.RetryPolicy
 import com.fssocrates.abc.core.SubmitResult
 import kotlinx.coroutines.CoroutineScope
@@ -21,16 +19,13 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * Authoritative admission: validate → enqueue → worker executes one at a time.
- * WAITING_FOR_USER holds the execution slot.
- * Retry = destroy WebView + fresh attempt.
+ * Execution workflow only. Admission owned by [AutomationJobManager].
  */
 class AutomationCoordinator(
     private val engine: AutomationEngine,
     private val browser: BrowserController,
+    private val jobManager: AutomationJobManager,
     private val options: AutomationOptions = AutomationOptions(),
-    private val jobStore: JobStore = JobStore(),
-    private val queue: JobQueue = JobQueue(),
     private val retryPolicy: RetryPolicy = RetryPolicy(maxAttempts = 2)
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -56,39 +51,31 @@ class AutomationCoordinator(
     }
 
     fun submit(job: AutomationJob): SubmitResult {
-        if (!engine.isUrlAllowed(job.targetUrl)) {
-            return SubmitResult.Rejected(RejectReason.INVALID_URL)
+        var result: SubmitResult = SubmitResult.Rejected(
+            com.fssocrates.abc.core.RejectReason.QUEUE_FULL
+        )
+        // Bridge suspend API for service callers
+        kotlinx.coroutines.runBlocking {
+            result = jobManager.submit(job)
+            if (result is SubmitResult.Accepted) {
+                durableStore?.save(job.id, "QUEUED")
+                Timber.i("ABC [%s] event=QUEUED", job.id)
+                pump()
+            }
         }
-        val script = job.script
-        if (script != null && !engine.isScriptAllowed(script)) {
-            return SubmitResult.Rejected(RejectReason.SCRIPT_REJECTED)
-        }
-        if (queue.size() >= options.maxQueueSize) {
-            return SubmitResult.Rejected(RejectReason.QUEUE_FULL)
-        }
-        queue.enqueue(job)
-        durableStore?.save(job.id, "QUEUED")
-        Timber.i("ABC [%s] event=QUEUED size=%d", job.id, queue.size())
-        pump()
-        return SubmitResult.Accepted(job.id)
-    }
-
-    /** @deprecated use submit */
-    fun start(job: AutomationJob): String? = when (val r = submit(job)) {
-        is SubmitResult.Accepted -> r.jobId
-        is SubmitResult.Rejected -> null
+        return result
     }
 
     private fun pump() {
-        if (engine.engineState.value != EngineState.IDLE) return
-        val job = queue.poll() ?: return
-        beginExecution(job)
+        scope.launch {
+            val job = jobManager.pollNext() ?: return@launch
+            beginExecution(job)
+        }
     }
 
     private fun beginExecution(job: AutomationJob) {
         lastJob = job
         pendingScript = job.script
-        // Fresh WebView environment per attempt
         browser.stop()
         durableStore?.save(job.id, "RUNNING")
         engine.startExecution(job)
@@ -104,15 +91,19 @@ class AutomationCoordinator(
             is AutomationEvent.PageLoaded ->
                 Timber.i("ABC [%s] event=PAGE_LOADED", event.jobId)
             is AutomationEvent.UserInteractionRequired -> {
+                scope.launch { jobManager.markWaiting(event.jobId) }
                 durableStore?.save(event.jobId, "WAITING_FOR_USER")
                 armUserInteractionTimeout(event.jobId)
                 onUserInteractionRequired?.invoke(event.jobId, event.reason, event.message)
             }
             is AutomationEvent.ResultProduced -> {
-                Timber.i("ABC [%s] event=RESULT type=%s", event.jobId, event.result.type)
+                scope.launch { jobManager.markResult(event.jobId, event.result) }
                 onResult?.invoke(event.jobId, event.result.value, event.result.type.name)
             }
-            is AutomationEvent.Completed -> finishTerminal(event.jobId, "COMPLETED", null, null)
+            is AutomationEvent.Completed -> {
+                scope.launch { jobManager.markTerminal(event.jobId, JobState.COMPLETED) }
+                finishTerminal(event.jobId, "COMPLETED", null, null)
+            }
             is AutomationEvent.Failed -> {
                 val code = if (event.error.startsWith("TIMEOUT")) "TIMEOUT" else "FAILED"
                 val job = lastJob
@@ -122,33 +113,43 @@ class AutomationCoordinator(
                     scope.launch {
                         delay(retryPolicy.backoffMs)
                         browser.destroy()
-                        // recreate via load path
                         beginExecution(job)
                     }
                 } else {
+                    scope.launch {
+                        jobManager.markTerminal(event.jobId, JobState.FAILED, event.error)
+                    }
                     finishTerminal(event.jobId, "FAILED", code, event.error)
                 }
             }
-            is AutomationEvent.Cancelled ->
+            is AutomationEvent.Cancelled -> {
+                scope.launch { jobManager.markTerminal(event.jobId, JobState.CANCELLED) }
                 finishTerminal(event.jobId, "CANCELLED", "CALLER_CANCELLED", null)
+            }
             is AutomationEvent.Queued -> {}
         }
     }
 
     fun resume() {
         timeoutJob?.cancel()
+        val id = engine.currentJob?.id
         engine.resumeAfterUserInteraction()
+        if (id != null) scope.launch { jobManager.markRunning(id) }
         pendingScript?.let {
             if (engine.isScriptAllowed(it)) browser.executeScript(it)
             pendingScript = null
         }
     }
 
-    fun cancel() {
+    fun cancel(jobId: String? = null) {
         timeoutJob?.cancel()
-        queue.clear()
+        scope.launch {
+            if (jobId != null) jobManager.cancel(jobId)
+            else engine.currentJob?.id?.let { jobManager.cancel(it) }
+        }
         engine.cancel()
         browser.stop()
+        pump()
     }
 
     fun status(): Pair<String?, String> {
@@ -183,7 +184,6 @@ class AutomationCoordinator(
         durableStore?.save(jobId, status, errorMessage)
         onTerminal?.invoke(jobId, status, errorCode, errorMessage)
         browser.stop()
-        // WAITING_FOR_USER held the slot; now free → pump queue
         scope.launch {
             delay(50)
             pump()

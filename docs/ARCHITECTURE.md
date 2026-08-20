@@ -16,3 +16,9 @@
 - One active WebView execution; WAITING_FOR_USER holds the slot
 - Retry = destroy WebView + new attempt
 - `result` ≠ `complete`
+
+## Ownership (1.0+)
+- **AutomationJobManager**: queue + job records; no WebView
+- **AutomationEngine**: active-job FSM only
+- **AutomationCoordinator**: execute pipeline
+- **BrowserController**: WebView lifecycle

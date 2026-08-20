@@ -39,7 +39,9 @@ class ABCForegroundService : Service() {
             ABCNotificationManager.buildLowPriority(this)
         )
         userInteraction = UserInteractionController(this)
-        coordinator = AutomationCoordinator(AutomationEngine(), AndroidBrowserController(this))
+        val eng = AutomationEngine()
+        val mgr = com.fssocrates.abc.core.AutomationJobManager(eng)
+        coordinator = AutomationCoordinator(eng, AndroidBrowserController(this), mgr)
         coordinator.durableStore = durable
         coordinator.onUserInteractionRequired = { jobId, reason, _ ->
             userInteraction.request(jobId, reason, null)
