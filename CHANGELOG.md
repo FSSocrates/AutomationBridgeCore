@@ -1,3 +1,9 @@
+## 1.1.1
+- Cancel by jobId
+- Lifecycle tests
+- INTEGRATION/SECURITY/TROUBLESHOOTING
+- Extra test pages
+
 ## 1.1.0
 - AutomationJobManager owns queue/records
 - Coordinator is execution-only
