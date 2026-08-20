@@ -11,9 +11,11 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,20 +27,18 @@ class MainActivity : ComponentActivity() {
 
     private var statusText by mutableStateOf("State: IDLE")
     private var resultText by mutableStateOf("Result: —")
+    private var urlText by mutableStateOf("https://example.com")
+    private var scriptText by mutableStateOf("ABC.result(location.href); ABC.complete();")
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             when (i?.action) {
                 IpcProtocol.BROADCAST_RESULT -> {
-                    val url = i.getStringExtra(IpcProtocol.EXTRA_RESULT_URL)
-                    val job = i.getStringExtra(IpcProtocol.EXTRA_JOB_ID)
-                    resultText = "Result [$job]: $url"
-                    statusText = "State: COMPLETED"
+                    resultText = "Result: ${i.getStringExtra(IpcProtocol.EXTRA_RESULT_URL)}"
+                    statusText = "State: RESULT (${i.getStringExtra(IpcProtocol.EXTRA_JOB_ID)})"
                 }
                 IpcProtocol.BROADCAST_EVENT -> {
-                    val ev = i.getStringExtra(IpcProtocol.EXTRA_EVENT) ?: "?"
-                    val job = i.getStringExtra(IpcProtocol.EXTRA_JOB_ID)
-                    statusText = "State: $ev ($job)"
+                    statusText = "State: ${i.getStringExtra(IpcProtocol.EXTRA_EVENT)} (${i.getStringExtra(IpcProtocol.EXTRA_JOB_ID)})"
                 }
             }
         }
@@ -57,37 +57,49 @@ class MainActivity : ComponentActivity() {
             registerReceiver(receiver, filter)
         }
 
+        val Mod = androidx.compose.ui.Modifier
         setContent {
             MaterialTheme {
                 Column(
-                    modifier = androidx.compose.ui.Modifier.fillMaxSize().padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
+                    modifier = Mod.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("ABC Sample Client", style = MaterialTheme.typography.headlineMedium)
-                    Text(statusText, modifier = androidx.compose.ui.Modifier.padding(top = 16.dp))
-                    Text(resultText, modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
+                    Text("ABC Demo", style = MaterialTheme.typography.headlineMedium)
+                    OutlinedTextField(
+                        value = urlText,
+                        onValueChange = { urlText = it },
+                        label = { Text("URL") },
+                        modifier = Mod.fillMaxWidth().padding(top = 16.dp)
+                    )
+                    OutlinedTextField(
+                        value = scriptText,
+                        onValueChange = { scriptText = it },
+                        label = { Text("Script") },
+                        modifier = Mod.fillMaxWidth().padding(top = 8.dp),
+                        minLines = 3
+                    )
+                    Text(statusText, modifier = Mod.padding(top = 16.dp))
+                    Text(resultText, modifier = Mod.padding(top = 4.dp))
                     Button(
                         onClick = {
                             statusText = "State: STARTING"
-                            AutomationBridge.start(
-                                this@MainActivity,
-                                url = "https://example.com",
-                                script = "ABC.result(window.location.href, \'URL\');"
-                            )
+                            AutomationBridge.start(this@MainActivity, urlText, scriptText)
                         },
-                        modifier = androidx.compose.ui.Modifier.padding(top = 24.dp)
+                        modifier = Mod.padding(top = 16.dp)
                     ) { Text("Start job") }
-                    Button(
-                        onClick = { AutomationBridge.status(this@MainActivity) },
-                        modifier = androidx.compose.ui.Modifier.padding(top = 8.dp)
-                    ) { Text("Status") }
+                    Button(onClick = { AutomationBridge.status(this@MainActivity) }, modifier = Mod.padding(top = 8.dp)) {
+                        Text("Status")
+                    }
+                    Button(onClick = { AutomationBridge.resume(this@MainActivity) }, modifier = Mod.padding(top = 8.dp)) {
+                        Text("Resume")
+                    }
                     Button(
                         onClick = {
                             AutomationBridge.cancel(this@MainActivity)
                             statusText = "State: CANCELLED"
                         },
-                        modifier = androidx.compose.ui.Modifier.padding(top = 8.dp)
+                        modifier = Mod.padding(top = 8.dp)
                     ) { Text("Cancel") }
                 }
             }

@@ -1,3 +1,8 @@
+## 1.2.0
+- Demo client URL/script fields
+- Maven publish to local build/repo
+- Docs polish
+
 ## 1.1.1
 - Cancel by jobId
 - Lifecycle tests

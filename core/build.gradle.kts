@@ -32,7 +32,24 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.fssocrates"
                 artifactId = "automation-bridge-core"
-                version = "1.0.0"
+                version = "1.1.1"
+                pom {
+                    name.set("AutomationBridgeCore")
+                    description.set("Android-native single-session web automation engine")
+                    url.set("https://github.com/FSSocrates/AutomationBridgeCore")
+                    licenses {
+                        license {
+                            name.set("Apache-2.0")
+                            url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                        }
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = "LocalBuild"
+                url = uri(rootProject.layout.buildDirectory.dir("repo"))
             }
         }
     }

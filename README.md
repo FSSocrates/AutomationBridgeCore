@@ -41,3 +41,11 @@ Optional `EXTRA_RESULT_PENDING_INTENT` for request-specific results.
 ## License
 
 Apache 2.0
+
+
+## Publish core (local)
+
+```bash
+./gradlew :core:publishReleasePublicationToLocalBuildRepository
+# artifacts under build/repo/
+```
